@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wave Mechanics</title>
+<meta name="description" content="Particle-in-a-box wavefunction discretized into a finite Hilbert space: coefficients, density, and the continuum limit.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f6f7f9;
+    --ink: #1a1a1a;
+    --ink-2: #555;
+    --ink-3: #8a8a8a;
+    --grid: #e3e5e8;
+    --axis: #9aa0a6;
+    --bar: #d62828;
+    --bar-edge: #1a1a1a;
+    --line: #1a1a1a;
+    --overlay: #2a6fdb;
+    --accent: #2a6fdb;
+    --border: #d9dce0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141618; --surface: #1d2023; --ink: #ececec; --ink-2: #b8b8b8; --ink-3: #8a8a8a;
+      --grid: #2b2f34; --axis: #6c7278; --bar: #e04b4b; --bar-edge: #ececec; --line: #ececec;
+      --overlay: #6ea0ff; --accent: #6ea0ff; --border: #33373c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141618; --surface: #1d2023; --ink: #ececec; --ink-2: #b8b8b8; --ink-3: #8a8a8a;
+    --grid: #2b2f34; --axis: #6c7278; --bar: #e04b4b; --bar-edge: #ececec; --line: #ececec;
+    --overlay: #6ea0ff; --accent: #6ea0ff; --border: #33373c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+  .cols .panel { margin-top: 0; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; }
+  .sub { color: var(--ink-2); margin: 0 0 14px; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; margin-bottom: 14px;
+    background: var(--surface); border: 1px solid var(--grid); border-radius: 8px; padding: 12px 14px;
+  }
+  .controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--ink-2); }
+  .controls input[type=number] {
+    width: 110px; padding: 6px 8px; font-size: 1rem; border: 1px solid var(--axis); border-radius: 6px;
+    background: var(--bg); color: var(--ink);
+  }
+  .controls input[type=range] { width: 180px; }
+  .controls button {
+    padding: 7px 14px; font-size: 0.95rem; border-radius: 6px; border: 1px solid var(--axis);
+    background: var(--bg); color: var(--ink); cursor: pointer;
+  }
+  .controls button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .check { flex-direction: row !important; align-items: center; gap: 6px !important; padding-bottom: 8px; }
+  .btns { display: flex; gap: 8px; }
+  .out {
+    margin: 0 0 14px; padding: 8px 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem;
+    background: var(--surface); border-left: 3px solid var(--accent); border-radius: 4px; white-space: pre-wrap;
+  }
+  .panel { margin-top: 18px; }
+  .panel h2 { font-size: 1rem; font-weight: 600; margin: 0 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel p { margin: 6px 0 0; color: var(--ink-2); font-size: 0.88rem; }
+  .plot { position: relative; width: 100%; height: 300px; }
+  .plot canvas { width: 100%; height: 100%; display: block; }
+  .tip {
+    position: absolute; pointer-events: none; display: none; padding: 4px 8px; font-size: 0.8rem;
+    background: var(--ink); color: var(--bg); border-radius: 4px; white-space: nowrap; transform: translate(-50%, -130%);
+  }
+  details { margin-top: 20px; color: var(--ink-2); font-size: 0.9rem; }
+  details summary { cursor: pointer; color: var(--ink); }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wave Mechanics: a wavefunction in a finite Hilbert space</h1>
+  <p class="sub">Particle in a box, ψ<sub>n</sub>(x) = √(2/L) sin(nπx/L). The box is split into N equal cells of width Δx = L/N. Each cell gets one coefficient c<sub>i</sub> with |c<sub>i</sub>| = √(∫<sub>cell</sub>|ψ|² dx).</p>
+
+  <div class="controls">
+    <label>Dimension of Hilbert space, N
+      <input id="numx" type="number" min="1" max="2000" step="1" value="2">
+    </label>
+    <label>&nbsp;
+      <input id="numxRange" type="range" min="1" max="200" step="1" value="2" aria-label="N slider">
+    </label>
+    <label>Quantum number n
+      <input id="n" type="number" min="1" max="100" step="1" value="1">
+    </label>
+    <label class="check"><input id="showDensity" type="checkbox"> Display Density, c<sub>i</sub> / √Δx</label>
+    <label class="check"><input id="autoscale" type="checkbox"> Autoscale histogram</label>
+    <div class="btns">
+      <button id="calc" class="primary">Calculate</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+  <div class="out" id="out"></div>
+
+  <div class="cols">
+    <section class="panel">
+      <h2>Wavefunction ψ(x) · √L</h2>
+      <div class="plot"><canvas id="psi"></canvas><div class="tip"></div></div>
+      <p>The exact wavefunction, sampled at least every 0.001 L. Thin vertical lines mark the cell boundaries. With the density shown, the red bars are c<sub>i</sub> / √Δx, which approaches ψ(x) as N grows.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Probability amplitudes c<sub>i</sub> using finite Δx</h2>
+      <div class="plot"><canvas id="coeff"></canvas><div class="tip"></div></div>
+      <p>One bar per cell, |c<sub>i</sub>| = √(∫<sub>cell</sub>|ψ|² dx), with the sign of ψ in that cell. The sum of the squares of these coefficients is the total probability.</p>
+    </section>
+  </div>
+
+  <details>
+    <summary>About this page</summary>
+    <p>This is an HTML + JavaScript port of <code>WaveMechanicsApp</code>, a Java program written by Larry Engelhardt in 2010 with the Open Source Physics library. For each cell, |ψ|² is integrated by the midpoint rule with sub-steps no wider than 0.001 L, and the square root gives |c<sub>i</sub>|; the sign is that of ψ in the cell. The original Java stepped by exactly 0.001 L and overshot each cell edge, which inflated the sum of squares for most N; this version fixes that. Defaults are N = 2, n = 1, as in the original.</p>
+    <p>Created by Larry Engelhardt, Francis Marion University, with Claude (Anthropic), 2026. Licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a>. Source: <a href="https://github.com/lengelhardt/wavefunction_finite_hilbert_space">github.com/lengelhardt/wavefunction_finite_hilbert_space</a>.</p>
+  </details>
+</main>
+
+<script>
+(() => {
+  const SMALL_DX = 0.001;
+  const SQ2 = Math.SQRT2;
+  const $ = id => document.getElementById(id);
+  const numxEl = $('numx'), rangeEl = $('numxRange'), nEl = $('n'), showDensityEl = $('showDensity'), autoscaleEl = $('autoscale'), outEl = $('out');
+
+  let model = null;
+
+  function compute(numx, n) {
+    const dx = 1 / numx;
+    const psiX = [], psiY = [];
+    const centers = [], coeff = [], density = [];
+    let normalization = 0;
+    for (let i = 0; i < numx; i++) {
+      let sum = 0, signed = 0;
+      // Midpoint rule with M equal sub-steps per cell, so each cell integrates exactly its own width.
+      // (The original Java stepped by a fixed 0.001 and overshot the cell edge, overcounting by up to 20%.)
+      const M = Math.ceil(dx / SMALL_DX), h = dx / M;
+      for (let k = 0; k < M; k++) {
+        const x = i * dx + (k + 0.5) * h;
+        const psi = SQ2 * Math.sin(n * Math.PI * x);
+        sum += psi * psi * h;
+        signed += psi * h;
+        psiX.push(x); psiY.push(psi);
+      }
+      // Magnitude as in the original Java (sqrt of the cell's probability); sign from the cell's net ∫ψ dx.
+      const c = (signed < 0 ? -1 : 1) * Math.sqrt(sum);
+      normalization += sum;
+      centers.push((i + 0.5) * dx);
+      coeff.push(c);
+      density.push(c / Math.sqrt(dx));
+    }
+    return { numx, n, dx, psiX, psiY, centers, coeff, density, normalization };
+  }
+
+  // ---------- drawing ----------
+  const PAD = { l: 56, r: 14, t: 10, b: 36 };
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function setupCanvas(canvas) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h };
+  }
+
+  function niceTicks(lo, hi, count) {
+    const span = hi - lo, raw = span / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const steps = [1, 2, 2.5, 5, 10];
+    let step = steps.map(s => s * mag).find(s => span / s <= count) || 10 * mag;
+    const ticks = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) ticks.push(+v.toFixed(10));
+    return ticks;
+  }
+
+  function frame(ctx, w, h, ylo, yhi, ylabel) {
+    const pw = w - PAD.l - PAD.r, ph = h - PAD.t - PAD.b;
+    const sx = x => PAD.l + x * pw;
+    const sy = y => PAD.t + (yhi - y) / (yhi - ylo) * ph;
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = '12px -apple-system, Helvetica, Arial, sans-serif';
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.fillStyle = css('--ink-2');
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (const t of niceTicks(ylo, yhi, 5)) {
+      const y = sy(t);
+      ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
+      ctx.fillText(t.toString(), PAD.l - 6, y);
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const t of niceTicks(0, 1, 5)) {
+      const x = sx(t);
+      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke();
+      ctx.fillText(t.toString(), x, h - PAD.b + 5);
+    }
+    ctx.strokeStyle = css('--axis');
+    ctx.beginPath(); ctx.moveTo(PAD.l, PAD.t); ctx.lineTo(PAD.l, h - PAD.b); ctx.lineTo(w - PAD.r, h - PAD.b); ctx.stroke();
+    if (ylo < 0 && yhi > 0) { ctx.beginPath(); ctx.moveTo(PAD.l, sy(0)); ctx.lineTo(w - PAD.r, sy(0)); ctx.stroke(); }
+    ctx.fillStyle = css('--ink-3'); ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    ctx.fillText('x / L', w - PAD.r, h - 2);
+    ctx.save(); ctx.translate(12, PAD.t + ph / 2); ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(ylabel, 0, 0); ctx.restore();
+    return { sx, sy, pw, ph };
+  }
+
+  function drawPsi(m, showDensity) {
+    const canvas = $('psi'); const { ctx, w, h } = setupCanvas(canvas);
+    const amp = Math.max(SQ2, showDensity ? Math.max(...m.density.map(Math.abs)) : 0) * 1.1;
+    const { sx, sy } = frame(ctx, w, h, -amp, amp, showDensity ? 'ψ(x)·√L  and  c / √Δx' : 'ψ(x)·√L');
+    if (showDensity) {
+      const y0 = sy(0), gap = m.numx > 150 ? 0 : 1;
+      ctx.fillStyle = css('--bar'); ctx.strokeStyle = css('--bar-edge'); ctx.lineWidth = 1; ctx.globalAlpha = 0.8;
+      for (let i = 0; i < m.numx; i++) {
+        const x1 = sx(i * m.dx) + gap, x2 = sx((i + 1) * m.dx) - gap;
+        bar(ctx, x1, x2, sy(m.density[i]), y0, m.numx <= 150);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = css('--axis'); ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    for (let i = 1; i < m.numx; i++) { const x = sx(i * m.dx); ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = css('--line'); ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (let k = 0; k < m.psiX.length; k++) { const X = sx(m.psiX[k]), Y = sy(m.psiY[k]); k ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+    ctx.stroke();
+    canvas._hit = { kind: 'line', sx, m, showDensity };
+  }
+
+  // Draw one bar from baseline y0 to y (either direction), with an optional outline.
+  function bar(ctx, x1, x2, y, y0, outline) {
+    const top = Math.min(y, y0), hgt = Math.abs(y0 - y), wid = Math.max(x2 - x1, 0.5);
+    ctx.fillRect(x1, top, wid, hgt);
+    if (outline && hgt > 1) ctx.strokeRect(x1 + 0.5, top + 0.5, wid - 1, hgt - 1);
+  }
+
+  function drawBars(id, values, ylabel, autoscale) {
+    const canvas = $(id); const { ctx, w, h } = setupCanvas(canvas);
+    const m = model;
+    // Always symmetric about zero so the x axis lines up with the wavefunction plot's.
+    const top = autoscale ? (Math.max(...values.map(Math.abs)) * 1.1 || 1) : 1;
+    const { sx, sy } = frame(ctx, w, h, -top, top, ylabel);
+    const y0 = sy(0);
+    ctx.fillStyle = css('--bar'); ctx.strokeStyle = css('--bar-edge'); ctx.lineWidth = 1;
+    const gap = m.numx > 150 ? 0 : 1;
+    for (let i = 0; i < m.numx; i++) {
+      const x1 = sx(i * m.dx) + gap, x2 = sx((i + 1) * m.dx) - gap;
+      bar(ctx, x1, x2, sy(values[i]), y0, m.numx <= 150);
+    }
+    canvas._hit = { kind: 'bars', sx, m, values, label: ylabel };
+  }
+
+  function render() {
+    if (!model) return;
+    drawPsi(model, showDensityEl.checked);
+    drawBars('coeff', model.coeff, 'c', autoscaleEl.checked);
+  }
+
+  // ---------- hover tooltips ----------
+  for (const plot of document.querySelectorAll('.plot')) {
+    const canvas = plot.querySelector('canvas'), tip = plot.querySelector('.tip');
+    canvas.addEventListener('mousemove', e => {
+      const hit = canvas._hit; if (!hit) return;
+      const r = canvas.getBoundingClientRect();
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      const x = (px - PAD.l) / (r.width - PAD.l - PAD.r);
+      if (x < 0 || x > 1 || py < PAD.t || py > r.height - PAD.b) { tip.style.display = 'none'; return; }
+      let text;
+      if (hit.kind === 'line') {
+        const psi = SQ2 * Math.sin(hit.m.n * Math.PI * x);
+        text = `x/L = ${x.toFixed(3)}   ψ√L = ${psi.toFixed(3)}`;
+        if (hit.showDensity) {
+          const i = Math.min(hit.m.numx - 1, Math.floor(x * hit.m.numx));
+          text += `   c/√Δx = ${hit.m.density[i].toFixed(4)}`;
+        }
+      } else {
+        const i = Math.min(hit.m.numx - 1, Math.floor(x * hit.m.numx));
+        text = `cell ${i + 1} of ${hit.m.numx}   x/L ∈ [${(i * hit.m.dx).toFixed(3)}, ${((i + 1) * hit.m.dx).toFixed(3)}]   ${hit.label} = ${hit.values[i].toFixed(4)}`;
+      }
+      tip.textContent = text; tip.style.display = 'block';
+      tip.style.left = Math.max(120, Math.min(r.width - 120, px)) + 'px'; tip.style.top = py + 'px';
+    });
+    canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  }
+
+  // ---------- controls ----------
+  function clampInt(el, lo, hi) {
+    let v = parseInt(el.value, 10); if (!Number.isFinite(v)) v = lo;
+    v = Math.max(lo, Math.min(hi, v)); el.value = v; return v;
+  }
+  function calculate() {
+    const numx = clampInt(numxEl, 1, 2000), n = clampInt(nEl, 1, 100);
+    rangeEl.value = Math.min(numx, +rangeEl.max);
+    model = compute(numx, n);
+    outEl.textContent = `The sum of the squares of the coefficients = ${model.normalization}`;
+    render();
+  }
+  function reset() { numxEl.value = 2; rangeEl.value = 2; nEl.value = 1; showDensityEl.checked = false; autoscaleEl.checked = false; calculate(); }
+
+  $('calc').addEventListener('click', calculate);
+  $('reset').addEventListener('click', reset);
+  numxEl.addEventListener('input', calculate);
+  nEl.addEventListener('input', calculate);
+  rangeEl.addEventListener('input', () => { numxEl.value = rangeEl.value; calculate(); });
+  showDensityEl.addEventListener('change', render);
+  autoscaleEl.addEventListener('change', render);
+  for (const el of [numxEl, nEl]) el.addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+  window.addEventListener('resize', render);
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+
+  reset();
+})();
+</script>
+</body>
+</html>
