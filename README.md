@@ -24,6 +24,10 @@ A particle in a box of length L has eigenstates ψₙ(x) = √(2/L) sin(nπx/L).
 
 Hover over a plot to read values.
 
+## Related
+
+[Quantum Dynamics in a 1D Box](https://lengelhardt.github.io/quantum_dynamics_1D_box/) is a companion simulation.
+
 ## Credits and license
 
 Created by Larry Engelhardt, Francis Marion University, with Claude (Anthropic), 2026. It is a port of `WaveMechanicsApp`, a Java program written by Larry Engelhardt in 2010 with the Open Source Physics library.
